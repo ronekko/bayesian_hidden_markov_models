@@ -56,11 +56,12 @@ void showTopics(const string &title, const vector<vector<double>> &phi, const in
 	bool use_stick = !!stick.size();
 	const int K = phi.size();
 	const int V = phi[0].size();
+	const int W = ceil(sqrt(V));
 	const int COLS = numColsPerRow;
 	const int ROWS = ceil(double(K) / double(COLS));
 	vector<vector<double>> phi_tmp(phi.begin(), phi.end());
 	vector<Mat> phiImages;
-	Mat result(ROWS*60, COLS*60, CV_32FC1);
+	Mat result(ROWS*(W*10+10), COLS*(W*10+10), CV_32FC1);
 
 	if(use_stick){
 		vector<std::pair<vector<double>, double>> phi_weighted;
@@ -83,10 +84,10 @@ void showTopics(const string &title, const vector<vector<double>> &phi, const in
 			
 	
 	for(int k=0; k<K; ++k){
-		Mat phiImage(5, 5, CV_32FC1);
-		for(int i=0; i<5; ++i){
-			for(int j=0; j<5; ++j){
-				phiImage.at<float>(i, j) = static_cast<float>(phi_tmp[k][i*5+j]);
+		Mat phiImage(W, W, CV_32FC1);
+		for(int i=0; i<W; ++i){
+			for(int j=0; j<W; ++j){
+				phiImage.at<float>(i, j) = static_cast<float>(phi_tmp[k][i*W+j]);
 			}
 		}
 		phiImages.push_back(upsample(phiImage, 10.0) * 5.0);
@@ -97,7 +98,7 @@ void showTopics(const string &title, const vector<vector<double>> &phi, const in
 	for(int k=0; k<K; ++k){
 		int row = k / COLS;
 		int col = k % COLS;
-		Mat roi = result(Rect(col*60+5, row*60+5, 50, 50));
+		Mat roi = result(Rect(col*(W * 10 + 10) + 5, row*(W * 10 + 10) + 5, W*10, W*10));
 		phiImages[k].copyTo(roi);
 	}
 	imshow(title, result);
@@ -146,51 +147,54 @@ int _tmain(int argc, _TCHAR* argv[])
 	const int M = 1000;
 	const int N_mean = 400;
 	const int V = 25;
-	int K_max = 20;
-	int K_init = 10;
-	const double ALPHA = 1.0;
-	boost::mt19937 engine;
-	vector<vector<double>> theta(M);
+	const int K = 10;
+	const double ALPHA = 1.0 / K;
+	const double BETA = 1.0 / V;
+	boost::mt19937 rgen;
 	
 	// create synthetic emission component distributions
-	vector<vector<double>> topics = createTopics();
-	showTopics("true topics", topics);
-	cv::waitKey();
-
-	const int K = topics.size();
-	vector<boost::random::discrete_distribution<>> word_distributions(K);
+	vector<vector<double>> B = createTopics();
+	// craete synthetic state transition matrix
+	vector<vector<double>> A(K, vector<double>(K));
+	std::array<double, 4> a = {0.85, 0.1, 0.025, 0.025};
 	for(int k=0; k<K; ++k){
-		word_distributions[k] = boost::random::discrete_distribution<>(topics[k]);
+		for(int r=0; r<a.size(); ++r){
+			int l = (k + r) % K;
+			A[k][l] = a[r];
+		}
 	}
-
-	vector<vector<int>> corpus(M);
-	vector<double> beta(K);
-	//boost::iota(beta, 1);
-	for(int k=0; k<K; ++k){
-		beta[K-1-k] = k*2 + 1;
-	}
-	beta = util::l1_normalize(beta);
-
-	for(auto bk:beta){
-		cout << bk << " ";
-	}cout << endl;
-	vector<double> alpha(K, ALPHA / K);
-	for(int k=0; k<K; ++k){
-		alpha[k] = ALPHA * beta[k];
+	{
+		vector<vector<double>> A_(1, vector<double>(K*K));
+		for(int k=0; k<K; ++k){
+			for(int l=0; l<K; ++l){
+				A_[0][k*K+l] = A[k][l];
+			}
+		}
+		showTopics("true B", B);
+		showTopics("true A", A_);
+		cv::waitKey();
 	}
 	
-	for(int m=0; m<M; ++m){
-		int N_m = boost::poisson_distribution<>(N_mean)(engine);
-		corpus[m].resize(N_m);
+	vector<boost::random::discrete_distribution<>> A_distributions(K);
+	vector<boost::random::discrete_distribution<>> B_distributions(K);
+	for(int k=0; k<K; ++k){
+		A_distributions[k] = boost::random::discrete_distribution<>(A[k]);
+		B_distributions[k] = boost::random::discrete_distribution<>(B[k]);
+	}
 
-		vector<double> theta_m = util::dirichletRandom(engine, alpha);
-		theta[m] = theta_m;
-
-		boost::random::discrete_distribution<> discrete(theta_m);
-		for(int i=0; i<N_m; ++i){
-			int k = discrete(engine);
-			int v = word_distributions[k](engine);
-			corpus[m][i] = v;
+	vector<vector<int>> corpus(M);	
+	for(int j=0; j<M; ++j){
+		int N_j = boost::poisson_distribution<>(N_mean)(rgen);
+		corpus[j].resize(N_j);
+		
+		int z_j0 = boost::uniform_int<>(0, K-1)(rgen);
+		corpus[j][0] = B_distributions[z_j0](rgen);
+		int z_prev = z_j0;
+		for(int i=1; i<N_j; ++i){
+			int k = A_distributions[z_prev](rgen);
+			int v = B_distributions[k](rgen);
+			corpus[j][i] = v;
+			z_prev = k;
 		}
 	}
 
