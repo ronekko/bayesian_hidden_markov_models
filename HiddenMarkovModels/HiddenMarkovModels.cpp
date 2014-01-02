@@ -49,7 +49,7 @@ void showSticks(const vector<double> &stickLengths)
 }
 
 
-// stickを指定すると、stickの長い順にソートする
+// if 'stick' is specified, then the topics are sorted according to the stick lengths
 void showTopics(const string &title, const vector<vector<double>> &phi, const int &numColsPerRow = 5, const vector<double> &stick = vector<double>())
 {
 	using namespace cv;
@@ -107,46 +107,34 @@ void showTopics(const string &title, const vector<vector<double>> &phi, const in
 
 vector<vector<double>> createTopics(void)
 {
-	// 0.18 * 5 + 0.005 * 20
+	// 0.1 * 9 + 0.00625 * 16
 	vector<vector<double>> topics;
 	const int V = 25;
 
 	for(int i=0; i<5; ++i){
-		vector<double> phi(V, 0.005);
+		vector<double> phi(V, 0.00625);
 		for(int j=0; j<5; ++j){
-			phi[i*5+j] = 0.18;
+			phi[i*5+j] = 0.1;
+			phi[j*5+i] = 0.1;
 		}
 		topics.push_back(phi);
 	}
 
 	for(int i=0; i<5; ++i){
-		vector<double> phi(V, 0.005);
+		vector<double> phi(V, 0.00625);
 		for(int j=0; j<5; ++j){
-			phi[j*5+i] = 0.18;
+			phi[i*5+(4-j)] = 0.1;
+			phi[j*5+(4-i)] = 0.1;
 		}
 		topics.push_back(phi);
 	}
 	
 	{
-		vector<double> phi(V, 0.005);
-		phi[0] = phi[6] = phi[12] = phi[18] = phi[24] = 0.18;
-		topics.push_back(phi);
+		vector<double> phi(V, 0.00625);
+		phi[0] = phi[4] = phi[6] = phi[8] = phi[12]
+		= phi[16] = phi[18] = phi[20] = phi[24] = 0.1;
+		topics[7] = phi;
 	}
-	{
-		vector<double> phi(V, 0.005);
-		phi[4] = phi[8] = phi[12] = phi[16] = phi[20] = 0.18;
-		topics.push_back(phi);
-	}
-	//{
-	//	vector<double> phi(V, 0.0);
-	//	phi[7] = phi[11] = phi[12] = phi[13] = phi[17] = 0.20;
-	//	topics.push_back(phi);
-	//}
-	//{
-	//	vector<double> phi(V, 0.0);
-	//	phi[6] = phi[8] = phi[12] = phi[16] = phi[18] = 0.20;
-	//	topics.push_back(phi);
-	//}
 
 	return topics;
 }
@@ -164,8 +152,11 @@ int _tmain(int argc, _TCHAR* argv[])
 	boost::mt19937 engine;
 	vector<vector<double>> theta(M);
 	
-	// 人工トピックたちの生成
+	// create synthetic emission component distributions
 	vector<vector<double>> topics = createTopics();
+	showTopics("true topics", topics);
+	cv::waitKey();
+
 	const int K = topics.size();
 	vector<boost::random::discrete_distribution<>> word_distributions(K);
 	for(int k=0; k<K; ++k){
