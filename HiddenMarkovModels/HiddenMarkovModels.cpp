@@ -141,7 +141,7 @@ vector<vector<double>> createTopics(void)
 }
 
 
-int _tmain(int argc, _TCHAR* argv[])
+vector<vector<int>> create_corpus(void)
 {
 	using namespace std;
 	const int M = 1000;
@@ -170,9 +170,8 @@ int _tmain(int argc, _TCHAR* argv[])
 				A_[0][k*K+l] = A[k][l];
 			}
 		}
-		showTopics("true B", B);
-		showTopics("true A", A_);
-		cv::waitKey();
+		showTopics("true B", B, 5);
+		showTopics("true A", A_, 5);
 	}
 	
 	vector<boost::random::discrete_distribution<>> A_distributions(K);
@@ -182,6 +181,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		B_distributions[k] = boost::random::discrete_distribution<>(B[k]);
 	}
 
+	// generate a corpus according to the generative model of HMM
 	vector<vector<int>> corpus(M);	
 	for(int j=0; j<M; ++j){
 		int N_j = boost::poisson_distribution<>(N_mean)(rgen);
@@ -199,10 +199,23 @@ int _tmain(int argc, _TCHAR* argv[])
 		}
 	}
 
+	return corpus;
+}
+
+int _tmain(int argc, _TCHAR* argv[])
+{
+	using namespace std;
+	const int M = 1000;
+	const int N_mean = 400;
+	const int V = 25;
+	const int K = 10;
+	const double ALPHA = 1.0 / K;
+	const double BETA = 1.0 / V;
+
+	vector<vector<int>> corpus = create_corpus();
+
+	HMM model(corpus, V, K, ALPHA, BETA,2);
 	
-	HMM model(corpus, V, K, 11);
-	
-	bool show_topics_with_sort = false;
 	for(int i=0; i<10000; ++i){
 		cout << "# " << i << " ##########" << endl;
 		boost::timer timer;
@@ -211,7 +224,17 @@ int _tmain(int argc, _TCHAR* argv[])
 		model.show_parameters();
 		cout << "perplexity: " << model.calc_perplexity() << endl<<endl;
 		
-		//showTopics("topics", learner.phi,10);
+		{
+			auto A = model.estimate_map_A();
+			vector<vector<double>> A_(1, vector<double>(K*K));
+			for(int k=0; k<K; ++k){
+				for(int l=0; l<K; ++l){
+					A_[0][k*K+l] = A[k][l];
+				}
+			}
+			showTopics("estimated A", A_, 5);
+			showTopics("estimated B", model.estimate_map_B(), 5);
+		}
 	}
 	return 0;
 }

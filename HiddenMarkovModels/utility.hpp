@@ -7,6 +7,23 @@ namespace util
 
 using namespace std;
 
+template<typename T>
+void print(vector<vector<T>> x){	
+	for(auto xk:x){
+		for(int i=0; i<xk.size(); ++i){
+			cout << xk[i] << " ";
+		}
+		cout << endl;
+	}cout << endl;
+}
+
+template<typename T>
+void print(vector<T> x){	
+	for(auto xk:x){
+		cout << xk << " ";
+	}cout << endl;
+}
+
 // 画像サイズをscale倍に拡大する。元画像の1ピクセルが、拡大後の画像で一辺scale [pixel]の正方形となるように拡大する。つまり平滑化しない。
 inline cv::Mat upsample(const cv::Mat &image, const int &scale)
 {

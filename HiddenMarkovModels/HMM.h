@@ -6,13 +6,17 @@ public:
 	~HMM(void);
 	HMM(const std::vector<std::vector<int>> &corpus,
 								const int &V,
-								const int &K = 10,
+								const int &K,
+								const double &ALPHA,
+								const double &BETA,
 								const int &seed = 0);
 	
 	void train(int iter);
 	void sample_z(void);
 	void show_parameters(void);
 	double calc_perplexity(void);
+	std::vector<std::vector<double>> estimate_map_A(void);
+	std::vector<std::vector<double>> estimate_map_B(void);
 	
 	// dataset
 	int M;				// number of sequences in the dataset 
@@ -25,16 +29,17 @@ public:
 	std::vector<std::vector<double>> B;	// emission distribution. B[k][v] is emission probability of word v from k-th multinomial distribution B[k]
 	// model hyperparameters
 	int K;								// number of states
-	double alpha;						// prior parameter for each A_k ~ Dir(alpha)
-	double beta;						// prior parameter for each B_k ~ Dir(beta)
+	double ALPHA;						// prior parameter for each A_k ~ Dir(alpha)
+	double BETA;						// prior parameter for each B_k ~ Dir(beta)
 	// random variables
 	const std::vector<std::vector<int>> x;	// x[j][i] is a observation word of i-th token in j-th sequence
 	std::vector<std::vector<int>> z;		// z[j][i] is a latent variable of i-th token in j-th sequence
 	// counts
 	std::vector<std::vector<int>> n_kl;	// counts of state transition from k to l in z
-	std::vector<std::vector<int>> n_kv;	// counts of occurrence of word v from state k
 	std::vector<int> n_ko;				// counts of state transition from k to any
-	std::vector<int> n_ok;				// counts of state transition from any to k
+	std::vector<std::vector<int>> n_kv;	// counts of occurrence of word v from state k
+	std::vector<int> n_k;				// counts of state k
+
 
 	boost::mt19937 rgen;
 };
