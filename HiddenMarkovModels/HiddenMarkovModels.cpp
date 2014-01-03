@@ -187,6 +187,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		int N_j = boost::poisson_distribution<>(N_mean)(rgen);
 		corpus[j].resize(N_j);
 		
+		// put uniform distribution for initial state
 		int z_j0 = boost::uniform_int<>(0, K-1)(rgen);
 		corpus[j][0] = B_distributions[z_j0](rgen);
 		int z_prev = z_j0;
