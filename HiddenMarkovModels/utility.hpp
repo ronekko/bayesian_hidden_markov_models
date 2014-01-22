@@ -336,6 +336,20 @@ T l2_normalize(const T &v){
 	}
 	return ret;
 }
+
+template<typename T>
+cv::Mat vector_to_Mat(std::vector<std::vector<T>> x)
+{
+	int rows = x.size();
+	int cols = x[0].size();
+	cv::Mat_<T> m(rows, cols);
+	for(int i=0; i<rows; ++i){
+		for(int j=0; j<cols; ++j){
+			m(i, j) = x[i][j];
+		}
+	}
+	return cv::Mat(m);
+}
 };
 
 

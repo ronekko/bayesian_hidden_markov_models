@@ -141,7 +141,22 @@ vector<vector<double>> createTopics(void)
 }
 
 
-vector<vector<int>> create_corpus(void)
+template<typename T>
+cv::Mat vector_to_Mat(std::vector<std::vector<T>> x)
+{
+	int rows = x.size();
+	int cols = x[0].size();
+	cv::Mat_<T> m(rows, cols);
+	for(int i=0; i<rows; ++i){
+		for(int j=0; j<cols; ++j){
+			m(i, j) = x[i][j];
+		}
+	}
+	return cv::Mat(m);
+}
+
+
+void create_corpus(vector<vector<int>> &observations, vector<vector<int>> &latent_states)
 {
 	using namespace std;
 	const int M = 1000;
@@ -156,6 +171,8 @@ vector<vector<int>> create_corpus(void)
 	vector<vector<double>> B = createTopics();
 	// craete synthetic state transition matrix
 	vector<vector<double>> A(K, vector<double>(K));
+	// create synthetic initial state prob
+	vector<double> pi = vector<double>(K, 1.0/K);
 	std::array<double, 4> a = {0.85, 0.1, 0.025, 0.025};
 	for(int k=0; k<K; ++k){
 		for(int r=0; r<a.size(); ++r){
@@ -182,24 +199,50 @@ vector<vector<int>> create_corpus(void)
 	}
 
 	// generate a corpus according to the generative model of HMM
-	vector<vector<int>> corpus(M);	
+	observations.resize(M);
+	latent_states.resize(M);
 	for(int j=0; j<M; ++j){
 		int N_j = boost::poisson_distribution<>(N_mean)(rgen);
-		corpus[j].resize(N_j);
+		observations[j].resize(N_j);
+		latent_states[j].resize(N_j);
 		
 		// put uniform distribution for initial state
-		int z_j0 = boost::uniform_int<>(0, K-1)(rgen);
-		corpus[j][0] = B_distributions[z_j0](rgen);
-		int z_prev = z_j0;
+		int z_j0 = util::multinomialByUnnormalizedParameters(rgen, pi);
+		latent_states[j][0] = z_j0;
+		observations[j][0] = B_distributions[z_j0](rgen);
 		for(int i=1; i<N_j; ++i){
+			int z_prev = latent_states[j][i-1];
 			int k = A_distributions[z_prev](rgen);
+			latent_states[j][i] = k;
 			int v = B_distributions[k](rgen);
-			corpus[j][i] = v;
-			z_prev = k;
+			observations[j][i] = v;
 		}
 	}
 
-	return corpus;
+	cv::FileStorage fs("parameter_true.xml", cv::FileStorage::WRITE);
+	fs << "pi" << cv::Mat(pi);
+	fs << "A" << vector_to_Mat(A);
+	fs << "B" << vector_to_Mat(B);
+}
+
+void create_corpus(vector<vector<int>> &observations)
+{
+	create_corpus(observations, vector<vector<int>>());
+}
+
+void save_corpus(const vector<vector<int>> &observations, const string &filename)
+{
+	using namespace std;
+	ofstream ofs(filename);
+	for(auto x_j : observations){
+		ostringstream oss;
+		for(auto x_ji : x_j){
+			oss << x_ji << " ";
+		}
+		string buf = oss.str();
+		boost::trim(buf);
+		ofs << buf << endl;
+	}
 }
 
 int _tmain(int argc, _TCHAR* argv[])
@@ -209,14 +252,18 @@ int _tmain(int argc, _TCHAR* argv[])
 	const int N_mean = 400;
 	const int V = 25;
 	const int K = 10;
-	const double ALPHA = 1.0 / K;
-	const double BETA = 1.0 / V;
+	const double ALPHA = 1.0;
+	const double BETA = 1.0;
 
-	vector<vector<int>> corpus = create_corpus();
+	vector<vector<int>> observations;
+	vector<vector<int>> states;
+	create_corpus(observations, states);
+	save_corpus(observations, "observations.txt");
+	save_corpus(states, "states.txt");
 
-	HMM model(corpus, V, K, ALPHA, BETA,2);
+	HMM model(observations, V, K, ALPHA, BETA);
 	
-	for(int i=0; i<10000; ++i){
+	for(int i=0; i<1000; ++i){
 		cout << "# " << i << " ##########" << endl;
 		boost::timer timer;
 		model.train(1);
@@ -236,6 +283,9 @@ int _tmain(int argc, _TCHAR* argv[])
 			showTopics("estimated B", model.estimate_map_B(), 5);
 		}
 	}
+	model.save_model_parameter("parameter_est.xml");
+	cv::waitKey(0);
+
 	return 0;
 }
 
