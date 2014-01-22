@@ -141,6 +141,20 @@ vector<vector<double>> createTopics(void)
 }
 
 
+template<typename T>
+cv::Mat vector_to_Mat(std::vector<std::vector<T>> x)
+{
+	int rows = x.size();
+	int cols = x[0].size();
+	cv::Mat_<T> m(rows, cols);
+	for(int i=0; i<rows; ++i){
+		for(int j=0; j<cols; ++j){
+			m(i, j) = x[i][j];
+		}
+	}
+	return cv::Mat(m);
+}
+
 
 void create_corpus(vector<vector<int>> &observations, vector<vector<int>> &latent_states)
 {
@@ -157,6 +171,8 @@ void create_corpus(vector<vector<int>> &observations, vector<vector<int>> &laten
 	vector<vector<double>> B = createTopics();
 	// craete synthetic state transition matrix
 	vector<vector<double>> A(K, vector<double>(K));
+	// create synthetic initial state prob
+	vector<double> pi = vector<double>(K, 1.0/K);
 	std::array<double, 4> a = {0.85, 0.1, 0.025, 0.025};
 	for(int k=0; k<K; ++k){
 		for(int r=0; r<a.size(); ++r){
@@ -191,7 +207,7 @@ void create_corpus(vector<vector<int>> &observations, vector<vector<int>> &laten
 		latent_states[j].resize(N_j);
 		
 		// put uniform distribution for initial state
-		int z_j0 = boost::uniform_int<>(0, K-1)(rgen);
+		int z_j0 = util::multinomialByUnnormalizedParameters(rgen, pi);
 		latent_states[j][0] = z_j0;
 		observations[j][0] = B_distributions[z_j0](rgen);
 		for(int i=1; i<N_j; ++i){
@@ -202,6 +218,11 @@ void create_corpus(vector<vector<int>> &observations, vector<vector<int>> &laten
 			observations[j][i] = v;
 		}
 	}
+
+	cv::FileStorage fs("true_parameter.xml", cv::FileStorage::WRITE);
+	fs << "pi" << cv::Mat(pi);
+	fs << "A" << vector_to_Mat(A);
+	fs << "B" << vector_to_Mat(B);
 }
 
 void create_corpus(vector<vector<int>> &observations)
