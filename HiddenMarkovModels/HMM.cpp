@@ -38,8 +38,10 @@ HMM::HMM(const std::vector<std::vector<int>> &corpus, const int &V, const int &K
 	n_ko = vector<int>(K);
 	n_kv = vector<vector<int>>(K, vector<int>(V));
 	n_k = vector<int>(K);
+	n_0k = vector<int>(K);
 	for(int j=0; j<M; ++j){
 		int N_j = N[j];
+		n_0k[z[j][0]]++;
 		for(int i=0; i<N_j-1; ++i){
 			int k = z[j][i];
 			int k_next = z[j][i+1];
@@ -73,6 +75,7 @@ void HMM::sample_z(void)
 			n_ko[k_current]--;
 			n_kv[k_current][v]--;
 			n_k[k_current]--;
+			n_0k[k_current]--;
 
 			// according to "A comparison of Bayesian extimators for unsupervised Hidden Markov Model POS taggers"
 			// without second term in Fig. 1
@@ -80,9 +83,11 @@ void HMM::sample_z(void)
 			for(int k=0; k<K; ++k){
 				// p(x_ji = v | z_ji = k, -)
 				double term_1 = (n_kv[k][v] + BETA) / (n_k[k] + V * BETA);
-				// p(z_{j,i+1} | p_ji = k, -)
+				// p(z_j0 = k | z_{j,-1} = 0, -), where z_{j,-1} = 0 means there is a psued token before the 1st token
+				double term_2 = (n_0k[k] + ALPHA);
+				// p(z_{j,i+1} | z_ji = k, -)
 				double term_3  = (n_kl[k][k_next] + ALPHA) / (n_ko[k] + K * ALPHA);
-				p_k[k] = term_1 * term_3;
+				p_k[k] = term_1 * term_2 * term_3;
 			}
 			int k_new = util::multinomialByUnnormalizedParameters(rgen, p_k);
 			z[j][0] = k_new;
@@ -90,6 +95,7 @@ void HMM::sample_z(void)
 			n_ko[k_new]++;
 			n_kv[k_new][v]++;
 			n_k[k_new]++;
+			n_0k[k_new]++;
 		}
 
 		// resample all tokens except first and last token
@@ -110,9 +116,9 @@ void HMM::sample_z(void)
 			for(int k=0; k<K; ++k){
 				// p(x_ji = v | z_ji = k, -)
 				double term_1 = (n_kv[k][v] + BETA) / (n_k[k] + V * BETA);
-				// p(z_ji = k | p_{j,i-1}, -)
+				// p(z_ji = k | z_{j,i-1}, -)
 				double term_2 = (n_kl[k_prev][k] + ALPHA);
-				// p(z_{j,i+1} | p_ji = k, -)
+				// p(z_{j,i+1} | z_ji = k, -)
 				double term_3_numerator  = n_kl[k][k_next] + ALPHA + ((k_prev == k && k == k_next) ? 1 : 0);
 				double term_3_denomiator = n_ko[k] + K * ALPHA + ((k_prev == k) ? 1 : 0);
 				double term_3 = term_3_numerator / term_3_denomiator;
@@ -145,7 +151,7 @@ void HMM::sample_z(void)
 			for(int k=0; k<K; ++k){
 				// p(x_ji = v | z_ji = k, -)
 				double term_1 = (n_kv[k][v] + BETA) / (n_k[k] + V * BETA);
-				// p(z_ji = k | p_{j,i-1}, -)
+				// p(z_ji = k | z_{j,i-1}, -)
 				double term_2 = (n_kl[k_prev][k] + ALPHA);
 				p_k[k] = term_1 * term_2;
 			}
@@ -166,6 +172,16 @@ void HMM::show_parameters(void)
 double HMM::calc_perplexity(void)
 {
 	return 0.0;
+}
+
+vector<double> HMM::estimate_map_pi(void)
+{
+	vector<double> pi(K);
+	for(int k=0; k<K; ++k){
+		pi[k] = (n_0k[k] + ALPHA) / (M + K * ALPHA);
+	}
+
+	return pi;
 }
 
 vector<vector<double>> HMM::estimate_map_A(void)
@@ -190,4 +206,16 @@ vector<vector<double>> HMM::estimate_map_B(void)
 	}
 
 	return B;
+}
+
+void HMM::save_model_parameter(const std::string &filename)
+{
+	cv::FileStorage fs(filename, cv::FileStorage::WRITE);
+	fs << "V" << V;
+	fs << "K" << K;
+	fs << "ALPHA" << ALPHA;
+	fs << "BETA" << BETA;
+	fs << "pi" << cv::Mat(estimate_map_pi());
+	fs << "A" << util::vector_to_Mat(estimate_map_A());
+	fs << "B" << util::vector_to_Mat(estimate_map_B());
 }

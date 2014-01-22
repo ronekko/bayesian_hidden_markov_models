@@ -219,7 +219,7 @@ void create_corpus(vector<vector<int>> &observations, vector<vector<int>> &laten
 		}
 	}
 
-	cv::FileStorage fs("true_parameter.xml", cv::FileStorage::WRITE);
+	cv::FileStorage fs("parameter_true.xml", cv::FileStorage::WRITE);
 	fs << "pi" << cv::Mat(pi);
 	fs << "A" << vector_to_Mat(A);
 	fs << "B" << vector_to_Mat(B);
@@ -263,7 +263,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	HMM model(observations, V, K, ALPHA, BETA);
 	
-	for(int i=0; i<10000; ++i){
+	for(int i=0; i<1000; ++i){
 		cout << "# " << i << " ##########" << endl;
 		boost::timer timer;
 		model.train(1);
@@ -283,6 +283,9 @@ int _tmain(int argc, _TCHAR* argv[])
 			showTopics("estimated B", model.estimate_map_B(), 5);
 		}
 	}
+	model.save_model_parameter("parameter_est.xml");
+	cv::waitKey(0);
+
 	return 0;
 }
 

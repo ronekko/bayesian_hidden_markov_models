@@ -15,8 +15,10 @@ public:
 	void sample_z(void);
 	void show_parameters(void);
 	double calc_perplexity(void);
+	std::vector<double> estimate_map_pi(void);
 	std::vector<std::vector<double>> estimate_map_A(void);
 	std::vector<std::vector<double>> estimate_map_B(void);
+	void save_model_parameter(const std::string &filename);
 	
 	// dataset
 	int M;				// number of sequences in the dataset 
@@ -39,6 +41,7 @@ public:
 	std::vector<int> n_ko;				// counts of state transition from k to any
 	std::vector<std::vector<int>> n_kv;	// counts of occurrence of word v from state k
 	std::vector<int> n_k;				// counts of state k
+	std::vector<int> n_0k;				// counts of 1st token's states = k
 
 
 	boost::mt19937 rgen;
