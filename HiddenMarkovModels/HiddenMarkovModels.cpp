@@ -2,10 +2,12 @@
 //
 
 #include "stdafx.h"
-#include "HMM.h"
 #include "utility.hpp"
+#include "HMM.h"
+#include "HMMBlockedGibbs.h"
 
-//unsigned int fp_control_state = _controlfp(_EM_INEXACT, _MCW_EM);
+#pragma warning(disable : 4996)
+unsigned int fp_control_state = _controlfp(_EM_INEXACT, _MCW_EM);
 
 using std::vector;
 using std::string;
@@ -156,11 +158,9 @@ cv::Mat vector_to_Mat(std::vector<std::vector<T>> x)
 }
 
 
-void create_corpus(vector<vector<int>> &observations, vector<vector<int>> &latent_states)
+void create_corpus(vector<vector<int>> &observations, vector<vector<int>> &latent_states, int M = 1000, int N_mean = 400)
 {
 	using namespace std;
-	const int M = 1000;
-	const int N_mean = 400;
 	const int V = 25;
 	const int K = 10;
 	const double ALPHA = 1.0 / K;
@@ -257,15 +257,16 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	vector<vector<int>> observations;
 	vector<vector<int>> states;
-	create_corpus(observations, states);
+	create_corpus(observations, states, M, N_mean);
 	save_corpus(observations, "observations.txt");
 	save_corpus(states, "states.txt");
-
-	HMM model(observations, V, K, ALPHA, BETA);
 	
+	//HMM model(observations, V, K, ALPHA, BETA);
+	HMMBlockedGibbs model(observations, V, K, ALPHA, BETA, 2);
+	
+	boost::timer timer;
 	for(int i=0; i<1000; ++i){
 		cout << "# " << i << " ##########" << endl;
-		boost::timer timer;
 		model.train(1);
 		cout << "time: " << timer.elapsed() << endl;
 		model.show_parameters();
@@ -280,7 +281,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				}
 			}
 			showTopics("estimated A", A_, 5);
-			showTopics("estimated B", model.estimate_map_B(), 5);
+			showTopics("estimated B", model.estimate_map_B());
 		}
 	}
 	model.save_model_parameter("parameter_est.xml");
